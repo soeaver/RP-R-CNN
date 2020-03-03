@@ -11,7 +11,7 @@ In this repository, we release the RP R-CNN code in Pytorch.
 
 
 ## Installation
-- 8 x TITAN Xp GPU
+- 8 x TITAN RTX GPU
 - pytorch1.1
 - python3.6.8
 
