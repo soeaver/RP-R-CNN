@@ -36,8 +36,8 @@ def build_dataset(dataset_list, is_train=True, local_rank=0):
             ann_types = ann_types + ('segm',)
         if cfg.MODEL.SEMSEG_ON:
             ann_types = ann_types + ('semseg',)
-        if cfg.MODEL.HIER_ON:
-            ann_types = ann_types + ('hier',)
+        if cfg.MODEL.PARSING_ON:
+            ann_types = ann_types + ('parsing',)
         args['ann_types'] = ann_types
         args['transforms'] = transforms
         # make dataset from factory

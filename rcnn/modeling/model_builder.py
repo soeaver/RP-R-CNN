@@ -12,7 +12,7 @@ from rcnn.modeling.rpn.rpn import build_rpn
 from rcnn.modeling.fast_rcnn.fast_rcnn import FastRCNN
 from rcnn.modeling.cascade_rcnn.cascade_rcnn import CascadeRCNN
 from rcnn.modeling.mask_rcnn.mask_rcnn import MaskRCNN
-from rcnn.modeling.hier_rcnn.hier_rcnn import HierRCNN
+from rcnn.modeling.parsing_rcnn.parsing_rcnn import ParsingRCNN
 from rcnn.modeling import registry
 from rcnn.core.config import cfg
 
@@ -61,8 +61,8 @@ class Generalized_RCNN(nn.Module):
         if cfg.MODEL.MASK_ON:
             self.Mask_RCNN = MaskRCNN(self.dim_in, self.spatial_scale)
 
-        if cfg.MODEL.HIER_ON:
-            self.Hier_RCNN = HierRCNN(self.dim_in, self.spatial_scale)
+        if cfg.MODEL.PARSING_ON:
+            self.Parsing_RCNN = ParsingRCNN(self.dim_in, self.spatial_scale)
 
         self._init_modules()
 
@@ -180,11 +180,11 @@ class Generalized_RCNN(nn.Module):
 
         return result
 
-    def hier_net(self, conv_features, result, targets=None):
+    def parsing_net(self, conv_features, result, targets=None):
         if len(result[0]) == 0:
-            return {}
+            return result
         with torch.no_grad():
-            x, result, loss_uv = self.Hier_RCNN(conv_features, result, targets)
+            x, result, loss_parsing = self.Parsing_RCNN(conv_features, result, targets)
 
         return result
 

@@ -34,6 +34,8 @@ ROI_MASK_OUTPUTS = Registry()
 MASKIOU_HEADS = Registry()
 MASKIOU_OUTPUTS = Registry()
 
-# Hier Head
-ROI_HIER_HEADS = Registry()
-ROI_HIER_OUTPUTS = Registry()
+# Parsing Head
+ROI_PARSING_HEADS = Registry()
+ROI_PARSING_OUTPUTS = Registry()
+PARSINGIOU_HEADS = Registry()
+PARSINGIOU_OUTPUTS = Registry()

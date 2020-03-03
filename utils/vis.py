@@ -74,42 +74,46 @@ def vis_mask(img, mask, bbox_color, show_parss=False):
     return img.astype(np.uint8)
 
 
-def vis_hier(img, hier, bbox_color):
-    border_thick = cfg.VIS.SHOW_HIER.BORDER_THICK
-    N = len(hier) // 5
-    for i in range(N):
-        if hier[i * 5 + 4] > 0:
-            cv2.rectangle(
-                img,
-                (int(hier[i * 5]), int(hier[i * 5 + 1])),
-                (int(hier[i * 5 + 2]), int(hier[i * 5 + 3])),
-                bbox_color,
-                thickness=border_thick
-            )
+def vis_parsing(img, parsing, colormap, show_segms=True):
+    """Visualizes a single binary parsing."""
+    img = img.astype(np.float32)
+    idx = np.nonzero(parsing)
 
-    return img
+    parsing_alpha = cfg.VIS.SHOW_PARSS.PARSING_ALPHA
+    colormap = colormap_utils.dict2array(colormap)
+    parsing_color = colormap[parsing.astype(np.int)]
+
+    border_color = cfg.VIS.SHOW_PARSS.BORDER_COLOR
+    border_thick = cfg.VIS.SHOW_PARSS.BORDER_THICK
+
+    img[idx[0], idx[1], :] *= 1.0 - parsing_alpha
+    # img[idx[0], idx[1], :] += alpha * parsing_color
+    img += parsing_alpha * parsing_color
+
+    if cfg.VIS.SHOW_PARSS.SHOW_BORDER and not show_segms:
+        _, contours, _ = cv2.findContours(parsing.copy(), cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
+        cv2.drawContours(img, contours, -1, border_color, border_thick, cv2.LINE_AA)
+
+    return img.astype(np.uint8)
 
 
 def get_instance_parsing_colormap(rgb=False):
     instance_colormap = eval('colormap_utils.{}'.format(cfg.VIS.SHOW_BOX.COLORMAP))
+    parsing_colormap = eval('colormap_utils.{}'.format(cfg.VIS.SHOW_PARSS.COLORMAP))
     if rgb:
         instance_colormap = colormap_utils.dict_bgr2rgb(instance_colormap)
+        parsing_colormap = colormap_utils.dict_bgr2rgb(parsing_colormap)
 
-    return instance_colormap, None
+    return instance_colormap, parsing_colormap
 
 
-def vis_one_image_opencv(im, config, boxes, classes, segms=None, hier=None, dataset=None):
+def vis_one_image_opencv(im, config, boxes, classes, segms=None, parsing=None, dataset=None):
     """Constructs a numpy array with the detections visualized."""
     timers = defaultdict(Timer)
     timers['bbox_prproc'].tic()
 
     global cfg
     cfg = config
-
-    if cfg.VIS.SHOW_HIER.ENABLED and hier is not None:
-        classes = np.array(classes)
-        boxes = boxes[classes == 1]
-        classes = classes[classes == 1]
 
     if boxes is None or boxes.shape[0] == 0 or max(boxes[:, 4]) < cfg.VIS.VIS_TH:
         return im
@@ -156,7 +160,7 @@ def vis_one_image_opencv(im, config, boxes, classes, segms=None, hier=None, data
             timers['show_class'].toc()
 
         show_segms = True if cfg.VIS.SHOW_SEGMS.ENABLED and segms is not None and len(segms) > i else False
-        show_hier = True if cfg.VIS.SHOW_HIER.ENABLED and hier is not None and len(hier) > i else False
+        show_parss = True if cfg.VIS.SHOW_PARSS.ENABLED and parsing is not None and len(parsing) > i else False
         # show mask
         if show_segms:
             timers['show_segms'].tic()
@@ -164,11 +168,11 @@ def vis_one_image_opencv(im, config, boxes, classes, segms=None, hier=None, data
             im = vis_mask(im, masks[..., i], ins_color, show_parss=show_parss)
             timers['show_segms'].toc()
 
-        # show hier
-        if show_hier:
-            timers['show_hier'].tic()
-            im = vis_hier(im, hier[i], ins_color)
-            timers['show_hier'].toc()
+        # show parsing
+        if show_parss:
+            timers['show_parss'].tic()
+            im = vis_parsing(im, parsing[i], parss_colormap, show_segms=show_segms)
+            timers['show_parss'].toc()
 
     # for k, v in timers.items():
     #     print(' | {}: {:.3f}s'.format(k, v.total_time))

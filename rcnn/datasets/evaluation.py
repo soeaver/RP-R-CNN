@@ -2,6 +2,7 @@ import os
 import json
 import pickle
 import tempfile
+import shutil
 import numpy as np
 from collections import OrderedDict
 
@@ -12,9 +13,11 @@ import torch
 
 from utils.data.structures.bounding_box import BoxList
 from utils.data.structures.boxlist_ops import boxlist_iou
+from utils.data.evaluation.parsing_eval import parsing_png, evaluate_parsing
 from utils.misc import logging_rank
 from rcnn.datasets import build_dataset, dataset_catalog
 from rcnn.modeling.mask_rcnn.inference import mask_results
+from rcnn.modeling.parsing_rcnn.inference import parsing_results
 from rcnn.core.config import cfg
 
 
@@ -31,18 +34,20 @@ def post_processing(results, image_ids, dataset):
         seg_results = []
         ims_segs = [None for _ in range(num_im)]
 
-    if cfg.MODEL.HIER_ON and cfg.HRCNN.EVAL_HIER:
-        hier_results, ims_hiers = prepare_hier_results(results, image_ids, dataset)
+    if cfg.MODEL.PARSING_ON:
+        par_results, par_score = prepare_parsing_results(results, image_ids, dataset)
+        ims_pars = par_results
     else:
-        hier_results = []
-        ims_hiers = [None for _ in range(num_im)]
+        par_results = []
+        par_score = []
+        ims_pars = [None for _ in range(num_im)]
 
-    eval_results = [box_results, seg_results, hier_results]
-    ims_results = [ims_dets, ims_labels, ims_segs, ims_hiers]
+    eval_results = [box_results, seg_results, par_results, par_score]
+    ims_results = [ims_dets, ims_labels, ims_segs, ims_pars]
     return eval_results, ims_results
 
 
-def evaluation(dataset, all_boxes, all_segms, all_hiers):
+def evaluation(dataset, all_boxes, all_segms, all_parss, all_pscores, clean_up=True):
     output_folder = os.path.join(cfg.CKPT, 'test')
     expected_results = ()
     expected_results_sigma_tol = 4
@@ -53,25 +58,38 @@ def evaluation(dataset, all_boxes, all_segms, all_hiers):
     if cfg.MODEL.MASK_ON:
         iou_types = iou_types + ("segm",)
         coco_results["segm"] = all_segms
-    if cfg.MODEL.HIER_ON and cfg.HRCNN.EVAL_HIER:
-        iou_types = iou_types + ("hier",)
-        coco_results['hier'] = all_hiers
+    if cfg.MODEL.PARSING_ON:
+        iou_types = iou_types + ("parsing",)
+        coco_results['parsing'] = [all_parss, all_pscores]
 
     results = COCOResults(*iou_types)
     logging_rank("Evaluating predictions", local_rank=0)
     for iou_type in iou_types:
-        with tempfile.NamedTemporaryFile() as f:
-            file_path = f.name
-            if output_folder:
-                file_path = os.path.join(output_folder, iou_type + ".json")
-            res = evaluate_predictions_on_coco(
-                dataset.coco, coco_results[iou_type], file_path, iou_type
+        if iou_type == "parsing":
+            eval_ap = cfg.PRCNN.EVAL_AP
+            num_parsing = cfg.PRCNN.NUM_PARSING
+            assert len(cfg.TEST.DATASETS) == 1, 'Parsing only support one dataset now'
+            im_dir = dataset_catalog.get_im_dir(cfg.TEST.DATASETS[0])
+            ann_fn = dataset_catalog.get_ann_fn(cfg.TEST.DATASETS[0])
+            res = evaluate_parsing(
+                coco_results[iou_type], eval_ap, cfg.PRCNN.SCORE_THRESH, num_parsing, im_dir, ann_fn, output_folder
             )
-            results.update(res)
+            results.update_parsing(res)
+        else:
+            with tempfile.NamedTemporaryFile() as f:
+                file_path = f.name
+                if output_folder:
+                    file_path = os.path.join(output_folder, iou_type + ".json")
+                res = evaluate_predictions_on_coco(
+                    dataset.coco, coco_results[iou_type], file_path, iou_type
+                )
+                results.update(res)
     logging_rank(results, local_rank=0)
     check_expected_results(results, expected_results, expected_results_sigma_tol)
     if output_folder:
         torch.save(results, os.path.join(output_folder, "coco_results.pth"))
+        if clean_up:
+            shutil.rmtree(output_folder)
     return results, coco_results
 
 
@@ -168,61 +186,39 @@ def prepare_segmentation_results(results, image_ids, dataset):
     return seg_results, ims_segs
 
 
-def prepare_hier_results(results, image_ids, dataset):
-    hier_results = []
-    ims_hiers = []
+def prepare_parsing_results(results, image_ids, dataset):
+    all_parsing = []
+    all_scores = []
+    output_folder = os.path.join(cfg.CKPT, 'test')
     for i, result in enumerate(results):
-        N = len(result)
-        if N == 0:
-            ims_hiers.append(None)
-            continue
         image_id = image_ids[i]
         original_id = dataset.id_to_img_map[image_id]
+        if len(result) == 0:
+            all_parsing.append([])
+            all_scores.append(0)
+            continue
         img_info = dataset.get_img_info(image_id)
         image_width = img_info["width"]
         image_height = img_info["height"]
-
-        hier_boxes = result.get_field("hier_boxes")
-        hier_scores = result.get_field("hier_scores")
-        pboxes_scores = result.get_field("pboxes_scores").tolist()
-        N = len(pboxes_scores)
-        ratios = tuple(float(s) / float(s_orig) for s, s_orig in zip((image_width, image_height), result.size))
-        ratio_w, ratio_h = ratios
-
-        hier_boxes[..., 0:4:2] *= ratio_w
-        hier_boxes[..., 1:4:2] *= ratio_h
-        hier_boxes = hier_boxes.reshape(N, -1, 4)
-        hier_scores = hier_scores.reshape(N, -1)
-
-        hiers = np.concatenate((hier_boxes, hier_scores[:, :, np.newaxis]), axis=2).reshape(N, -1)
-        ims_hiers.append(hiers)
-        hier_results.extend(
-            [
-                {
-                    "image_id": original_id,
-                    "category_id": 1,
-                    "hier": hier.tolist(),
-                    "score": pboxes_scores[k],
-                }
-                for k, hier in enumerate(hiers)
-            ]
+        result = result.resize((image_width, image_height))
+        semseg = result.get_field("semseg") if cfg.MODEL.SEMSEG_ON else None
+        parsing = result.get_field("parsing")
+        parsing = parsing_results(parsing, result, semseg=semseg)
+        scores = result.get_field("parsing_scores")
+        parsing_png(
+            parsing, scores, cfg.PRCNN.SEMSEG_SCORE_THRESH, img_info, output_folder, semseg=semseg
         )
-    return hier_results, ims_hiers
+        all_parsing.append(parsing)
+        all_scores.append(scores)
+    return all_parsing, all_scores
 
 
 def evaluate_predictions_on_coco(coco_gt, coco_results, json_result_file, iou_type="bbox"):
     with open(json_result_file, "w") as f:
         json.dump(coco_results, f)
-    if cfg.MODEL.HIER_ON and iou_type == "bbox":
-        box_results = get_box_result()
-        coco_dt = coco_gt.loadRes(str(json_result_file)) if coco_results else COCO()
-        coco_gt = coco_gt.loadRes(box_results)
-        # coco_dt = coco_gt.loadRes(coco_results)
-        coco_eval = COCOeval(coco_gt, coco_dt, iou_type, True)
-    else:
-        coco_dt = coco_gt.loadRes(str(json_result_file)) if coco_results else COCO()
-        # coco_dt = coco_gt.loadRes(coco_results)
-        coco_eval = COCOeval(coco_gt, coco_dt, iou_type)
+    coco_dt = coco_gt.loadRes(str(json_result_file)) if coco_results else COCO()
+    # coco_dt = coco_gt.loadRes(coco_results)
+    coco_eval = COCOeval(coco_gt, coco_dt, iou_type)
     coco_eval.evaluate()
     coco_eval.accumulate()
     if iou_type == "bbox":
@@ -289,11 +285,11 @@ class COCOResults(object):
     METRICS = {
         "bbox": ["AP", "AP50", "AP75", "APs", "APm", "APl"],
         "segm": ["AP", "AP50", "AP75", "APs", "APm", "APl"],
-        "hier": ["AP", "AP50", "AP75", "APs", "APm", "APl"],
+        "parsing": ["mIoU", "APp50", "APpvol", "PCP"],
     }
 
     def __init__(self, *iou_types):
-        allowed_types = ("box_proposal", "bbox", "segm", "hier")
+        allowed_types = ("box_proposal", "bbox", "segm", "parsing")
         assert all(iou_type in allowed_types for iou_type in iou_types)
         results = OrderedDict()
         for iou_type in iou_types:
@@ -314,6 +310,14 @@ class COCOResults(object):
         for idx, metric in enumerate(metrics):
             res[metric] = s[idx]
 
+    def update_parsing(self, eval):
+        if eval is None:
+            return
+
+        res = self.results['parsing']
+        for k, v in eval.items():
+            res[k] = v
+            
     def __repr__(self):
         # TODO make it pretty
         return repr(self.results)

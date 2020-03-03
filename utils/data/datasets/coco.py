@@ -11,13 +11,7 @@ import torchvision
 from utils.data.structures.bounding_box import BoxList
 from utils.data.structures.segmentation_mask import SegmentationMask
 from utils.data.structures.semantic_segmentation import SemanticSegmentation, get_semseg
-from utils.data.structures.hier import Hier
-
-min_hier_per_image = 1
-
-
-def _count_visible_hier(anno):
-    return sum(sum(1 for v in ann["hier"][4::5] if v > 0) for ann in anno)
+from utils.data.structures.parsing import Parsing, get_parsing, set_flip
 
 
 def _has_only_empty_bbox(anno):
@@ -37,13 +31,6 @@ def has_valid_annotation(anno, ann_types, filter_crowd=True):
     # if all boxes have close to zero area, there is no annotation
     if _has_only_empty_bbox(anno):
         return False
-    if 'hier' in ann_types:
-        hier_vis = _count_visible_hier(anno) >= min_hier_per_image
-    else:
-        hier_vis = True
-
-    if hier_vis:
-        return True
 
     return False
 
@@ -77,6 +64,8 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
         categories = [c['name'] for c in self.coco.loadCats(category_ids)]
         self.classes = ['__background__'] + categories
         self.ann_types = ann_types
+        if 'parsing' in self.ann_types:
+            set_flip(self.root)
         self._transforms = transforms
 
     def __getitem__(self, idx):
@@ -111,11 +100,10 @@ class COCODataset(torchvision.datasets.coco.CocoDetection):
                 semsegs = SemanticSegmentation(semsegs_anno, classes, img.size, mode='poly')
             target.add_field("semsegs", semsegs)
 
-        if 'hier' in self.ann_types:
-            if anno and "hier" in anno[0]:
-                hier = [obj["hier"] for obj in anno]
-                hier = Hier(hier, img.size)
-                target.add_field("hier", hier)
+        if 'parsing' in self.ann_types:
+            parsing = [get_parsing(self.root, obj["parsing"]) for obj in anno]
+            parsing = Parsing(parsing, img.size)
+            target.add_field("parsing", parsing)
 
         target = target.clip_to_image(remove_empty=True)
 

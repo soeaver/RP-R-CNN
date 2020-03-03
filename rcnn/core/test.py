@@ -7,6 +7,7 @@ import torch
 from utils.data.structures.bounding_box import BoxList
 from utils.data.structures.boxlist_ops import cat_boxlist, boxlist_nms, \
     boxlist_ml_nms, boxlist_soft_nms, boxlist_box_voting
+from utils.data.structures.parsing import flip_parsing_featuremap
 from rcnn.core.config import cfg
 
 
@@ -132,13 +133,73 @@ def im_detect_mask(model, rois, features):
     return results
 
 
-def im_detect_hier(model, rois, features):
+def im_detect_parsing(model, rois, features):
     _idx = 0
-    hier_results = [[] for _ in range(len(rois))]
+    parsing_results = [[] for _ in range(len(rois))]
+    parsing_scores = [[] for _ in range(len(rois))]
     conv_features = features[_idx][1]
     _idx += 1
-    results = model.hier_net(conv_features, rois, targets=None)
-    assert not cfg.TEST.BBOX_AUG.ENABLED or not cfg.TEST.PARSING_AUG.ENABLED
+    results = model.parsing_net(conv_features, rois, targets=None)
+
+    if cfg.TEST.BBOX_AUG.ENABLED and cfg.TEST.PARSING_AUG.ENABLED:
+        if len(rois[0]) == 0:
+            return results
+        parsings = [result.get_field("parsing") for result in results]
+        add_results(parsing_results, parsings)
+        scores = [result.get_field("parsing_scores") for result in results]
+        add_results(parsing_scores, scores)
+        if cfg.TEST.BBOX_AUG.H_FLIP:
+            rois_hf = [roi.transpose(0) for roi in rois]
+            features_hf = features[_idx][1]
+            _idx += 1
+            results_hf = model.parsing_net(features_hf, rois_hf, targets=None)
+            parsings_hf = [result_hf.get_field("parsing") for result_hf in results_hf]
+            parsings_hf = [flip_parsing_featuremap(parsing_hf) for parsing_hf in parsings_hf]
+            add_results(parsing_results, parsings_hf)
+            scores_hf = [result_hf.get_field("parsing_scores") for result_hf in results_hf]
+            add_results(parsing_scores, scores_hf)
+
+        for scale in cfg.TEST.BBOX_AUG.SCALES:
+            rois_scl = [roi.resize(size) for roi, size in zip(rois, features[_idx][0])]
+            features_scl = features[_idx][1]
+            _idx += 1
+            results_scl = model.parsing_net(features_scl, rois_scl, targets=None)
+            parsings_scl = [result_scl.get_field("parsing") for result_scl in results_scl]
+            add_results(parsing_results, parsings_scl)
+            scores_scl = [result_scl.get_field("parsing_scores") for result_scl in results_scl]
+            add_results(parsing_scores, scores_scl)
+
+            if cfg.TEST.BBOX_AUG.H_FLIP:
+                rois_scl_hf = [roi.resize(size) for roi, size in zip(rois, features[_idx][0])]
+                rois_scl_hf = [roi.transpose(0) for roi in rois_scl_hf]
+                features_scl_hf = features[_idx][1]
+                _idx += 1
+                results_scl_hf = model.parsing_net(features_scl_hf, rois_scl_hf, targets=None)
+                parsings_scl_hf = [result_scl_hf.get_field("parsing") for result_scl_hf in results_scl_hf]
+                parsings_scl_hf = [flip_parsing_featuremap(parsing_scl_hf) for parsing_scl_hf in parsings_scl_hf]
+                add_results(parsing_results, parsings_scl_hf)
+                scores_scl_hf = [result_scl_hf.get_field("parsing_scores") for result_scl_hf in results_scl_hf]
+                add_results(parsing_scores, scores_scl_hf)
+
+        for parsings_ts, scores_ts, result in zip(parsing_results, parsing_scores, results):
+            scores_c = np.mean(scores_ts, axis=0)
+            # Combine the predicted soft parsings
+            if cfg.TEST.PARSING_AUG.HEUR == 'SOFT_AVG':
+                parsings_c = np.mean(parsings_ts, axis=0)
+            elif cfg.TEST.PARSING_AUG.HEUR == 'SOFT_MAX':
+                parsings_c = np.amax(parsings_ts, axis=0)
+            elif cfg.TEST.PARSING_AUG.HEUR == 'LOGIT_AVG':
+
+                def logit(y):
+                    return -1.0 * np.log((1.0 - y) / np.maximum(y, 1e-20))
+
+                logit_parsings = [logit(y) for y in parsings_ts]
+                logit_parsings = np.mean(logit_parsings, axis=0)
+                parsings_c = 1.0 / (1.0 + np.exp(-logit_parsings))
+            else:
+                raise NotImplementedError('Heuristic {} not supported'.format(cfg.TEST.PARSING_AUG.HEUR))
+            result.add_field("parsing", parsings_c)
+            result.add_field("parsing_scores", scores_c)
 
     return results
 
@@ -185,12 +246,6 @@ def im_detect_bbox_net(model, ims, target_scale, target_max_size, flip=False, si
 def add_results(all_results, results):
     for i in range(len(all_results)):
         all_results[i].append(results[i])
-
-
-def add_uv_results(all_results, results):
-    for i in range(len(all_results)):
-        for j in range(4):
-            all_results[i][j].append(results[i][j])
 
 
 def get_blob(ims, target_scale, target_max_size, flip):

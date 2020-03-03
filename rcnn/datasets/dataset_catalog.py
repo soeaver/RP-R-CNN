@@ -14,66 +14,6 @@ _ANN_FN = 'annotation_file'
 
 # Available datasets
 _DATASETS = {
-    'cocohumanparts_2017_headface_train': {
-        _IM_DIR:
-            _DATA_DIR + '/coco/images/train2017',
-        _ANN_FN:
-            _DATA_DIR + '/coco/annotations/COCOHumanParts/instance_headface_train2017.json',
-    },
-    'cocohumanparts_2017_headface_val': {
-        _IM_DIR:
-            _DATA_DIR + '/coco/images/val2017',
-        _ANN_FN:
-            _DATA_DIR + '/coco/annotations/COCOHumanParts/instance_headface_val2017.json',
-    },
-    'cocohumanparts_2017_personheadface_train': {
-        _IM_DIR:
-            _DATA_DIR + '/coco/images/train2017',
-        _ANN_FN:
-            _DATA_DIR + '/coco/annotations/COCOHumanParts/instance_personheadface_train2017.json',
-    },
-    'cocohumanparts_2017_personheadface_val': {
-        _IM_DIR:
-            _DATA_DIR + '/coco/images/val2017',
-        _ANN_FN:
-            _DATA_DIR + '/coco/annotations/COCOHumanParts/instance_personheadface_val2017.json',
-    },
-    'cocohumanparts_2017_all_train': {
-        _IM_DIR:
-            _DATA_DIR + '/coco/images/train2017',
-        _ANN_FN:
-            _DATA_DIR + '/coco/annotations/COCOHumanParts/instance_humanparts_train2017.json',
-    },
-    'cocohumanparts_2017_all_val': {
-        _IM_DIR:
-            _DATA_DIR + '/coco/images/val2017',
-        _ANN_FN:
-            _DATA_DIR + '/coco/annotations/COCOHumanParts/instance_humanparts_val2017.json',
-    },
-    'cocohumanparts_2017_onlyparts_train': {
-        _IM_DIR:
-            _DATA_DIR + '/coco/images/train2017',
-        _ANN_FN:
-            _DATA_DIR + '/coco/annotations/COCOHumanParts/instance_onlyparts_train2017.json',
-    },
-    'cocohumanparts_2017_onlyparts_val': {
-        _IM_DIR:
-            _DATA_DIR + '/coco/images/val2017',
-        _ANN_FN:
-            _DATA_DIR + '/coco/annotations/COCOHumanParts/instance_onlyparts_val2017.json',
-    },
-    'humanparts_coco_2017_train': {
-        _IM_DIR:
-            _DATA_DIR + '/coco/images/train2017',
-        _ANN_FN:
-            _DATA_DIR + '/coco/annotations/COCOHumanParts/person_humanparts_train2017.json',
-    },
-    'humanparts_coco_2017_val': {
-        _IM_DIR:
-            _DATA_DIR + '/coco/images/val2017',
-        _ANN_FN:
-            _DATA_DIR + '/coco/annotations/COCOHumanParts/person_humanparts_val2017.json',
-    },
 }
 _DATASETS.update(COMMON_DATASETS)
 

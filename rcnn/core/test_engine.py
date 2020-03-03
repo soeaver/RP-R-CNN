@@ -46,14 +46,14 @@ def test_net_on_dataset(args, multi_gpu=False):
     total_timer.tic()
     if multi_gpu:
         num_images = len(dataset)
-        all_boxes, all_segms, all_hiers = multi_gpu_test_net_on_dataset(args, num_images)
+        all_boxes, all_segms, all_parss, all_pscores = multi_gpu_test_net_on_dataset(args, num_images)
     else:
-        all_boxes, all_segms, all_hiers = test_net(args)
+        all_boxes, all_segms, all_parss, all_pscores = test_net(args)
 
     total_timer.toc(average=False)
     logging_rank('Total inference time: {:.3f}s'.format(total_timer.average_time), local_rank=0)
 
-    return evaluation(dataset, all_boxes, all_segms, all_hiers)
+    return evaluation(dataset, all_boxes, all_segms, all_parss, all_pscores)
 
 
 def multi_gpu_test_net_on_dataset(args, num_images):
@@ -70,24 +70,27 @@ def multi_gpu_test_net_on_dataset(args, num_images):
     # Collate the results from each subprocess
     all_boxes = []
     all_segms = []
-    all_hiers = []
+    all_parss = []
+    all_pscores = []
 
     for ins_data in outputs:
         all_boxes += ins_data['all_boxes']
         all_segms += ins_data['all_segms']
-        all_hiers += ins_data['all_hiers']
+        all_parss += ins_data['all_parss']
+        all_pscores += ins_data['all_pscores']
 
     det_file = os.path.join(cfg.CKPT, 'test', 'detections.pkl')
     save_object(
         dict(
             all_boxes=all_boxes,
             all_segms=all_segms,
-            all_hiers=all_hiers,
+            all_parss=all_parss,
+            all_pscores=all_pscores,
         ), det_file
     )
 
     logging_rank('Wrote detections to: {}'.format(os.path.abspath(det_file)), local_rank=0)
-    return all_boxes, all_segms, all_hiers
+    return all_boxes, all_segms, all_parss, all_pscores
 
 
 def test_net(args, ind_range=None):
@@ -102,7 +105,7 @@ def test_net(args, ind_range=None):
         start_ind = 0
         end_ind = len(dataset)
     model = initialize_model_from_cfg()
-    all_boxes, all_segms, all_hiers  = test(model, dataset, start_ind, end_ind, logger)
+    all_boxes, all_segms, all_parss, all_pscores = test(model, dataset, start_ind, end_ind, logger)
     if ind_range is not None:
         det_name = 'detection_range_%s_%s.pkl' % tuple(ind_range)
     else:
@@ -112,18 +115,20 @@ def test_net(args, ind_range=None):
         dict(
             all_boxes=all_boxes,
             all_segms=all_segms,
-            all_hiers=all_hiers,
+            all_parss=all_parss,
+            all_pscores=all_pscores,
         ), det_file
     )
 
     logging_rank('Wrote detections to: {}'.format(os.path.abspath(det_file)), local_rank=0)
-    return all_boxes, all_segms, all_hiers
+    return all_boxes, all_segms, all_parss, all_pscores
 
 
 def test(model, dataset, start_ind, end_ind, logger):
     all_boxes = []
     all_segms = []
-    all_hiers = []
+    all_parss = []
+    all_pscores = []
     num_img = cfg.TEST.IMS_PER_GPU
     with torch.no_grad():
         for i in range(start_ind, end_ind, num_img):
@@ -142,13 +147,13 @@ def test(model, dataset, start_ind, end_ind, logger):
             result, features = rcnn_test.im_detect_bbox(model, ims)
             if cfg.MODEL.MASK_ON:
                 result = rcnn_test.im_detect_mask(model, result, features)
-            if cfg.MODEL.HIER_ON:
-                result = rcnn_test.im_detect_hier(model, result, features)
+            if cfg.MODEL.PARSING_ON:
+                result = rcnn_test.im_detect_parsing(model, result, features)
             logger.infer_toc()
             logger.post_tic()
             eval_results, ims_results = post_processing(result, image_ids, dataset)
-            box_results, seg_results, hier_results = eval_results
-            ims_dets, ims_labels, ims_segs, ims_hiers = ims_results
+            box_results, seg_results, par_results, par_score = eval_results
+            ims_dets, ims_labels, ims_segs, ims_pars = ims_results
             if cfg.VIS.ENABLED:
                 for k, im in enumerate(ims):
                     if len(ims_dets) == 0:
@@ -160,18 +165,19 @@ def test(model, dataset, start_ind, end_ind, logger):
                         ims_dets[k],
                         ims_labels[k],
                         segms=ims_segs[k],
-                        hier=ims_hiers[k],
+                        parsing=ims_pars[k],
                         dataset=dataset,
                     )
                     cv2.imwrite(os.path.join(cfg.CKPT, 'vis', '{}'.format(im_name)), vis_im)
             all_boxes += box_results
             all_segms += seg_results
-            all_hiers += hier_results
+            all_parss += par_results
+            all_pscores += par_score
             logger.post_toc()
             logger.iter_toc()
             logger.log_stats(i, start_ind, end_ind, len(dataset))
 
-    return all_boxes, all_segms, all_hiers
+    return all_boxes, all_segms, all_parss, all_pscores
 
 
 def initialize_model_from_cfg():

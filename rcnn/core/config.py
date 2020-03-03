@@ -82,8 +82,8 @@ __C.MODEL.CASCADE_ON = False
 # Indicates the model makes instance mask predictions (as in Mask R-CNN)
 __C.MODEL.MASK_ON = False
 
-# Indicates the model makes part bbox predictions (as in Hier R-CNN)
-__C.MODEL.HIER_ON = False  # TODO
+# Indicates the model makes parsing predictions (as in Parsing R-CNN)
+__C.MODEL.PARSING_ON = False
 
 # Type of batch normalizaiton, default: 'freeze'
 # E.g., 'normal', 'freeze', 'sync', ...
@@ -372,6 +372,20 @@ __C.TEST.MASK_AUG.ENABLED = False
 # SOFT prefix indicates that the computation is performed on soft masks
 #   Valid options: ('SOFT_AVG', 'SOFT_MAX', 'LOGIT_AVG')
 __C.TEST.MASK_AUG.HEUR = 'SOFT_AVG'
+
+# ---------------------------------------------------------------------------- #
+# Test-time augmentations for parsing detection
+# ---------------------------------------------------------------------------- #
+__C.TEST.PARSING_AUG = AttrDict()
+
+# Enable test-time augmentation for instance parsing detection if True
+__C.TEST.PARSING_AUG.ENABLED = False
+
+# Heuristic used to combine parsing predictions
+# SOFT prefix indicates that the computation is performed on soft parsings
+#   Valid options: ('SOFT_AVG', 'SOFT_MAX', 'LOGIT_AVG')
+__C.TEST.PARSING_AUG.HEUR = 'SOFT_AVG'
+
 
 # ---------------------------------------------------------------------------- #
 # Backbone options
@@ -1098,171 +1112,153 @@ __C.MRCNN.MASKIOU.MLP_DIM = 1024
 # Loss weight for Mask IoU head
 __C.MRCNN.MASKIOU.LOSS_WEIGHT = 1.0
 
-# ---------------------------------------------------------------------------- #
-# hier R-CNN options ("HRCNN" = Mask R-CNN with Hier support)
-# ---------------------------------------------------------------------------- #
-__C.HRCNN = AttrDict()
 
-# The head of hier R-CNN to use
+# ---------------------------------------------------------------------------- #
+# Parsing R-CNN options ("PRCNN" means Pask R-CNN)
+# ---------------------------------------------------------------------------- #
+__C.PRCNN = AttrDict()
+
+# The head of Parsing R-CNN to use
 # (e.g., "roi_convx_head")
-__C.HRCNN.ROI_HIER_HEAD = "roi_convx_head"
+__C.PRCNN.ROI_PARSING_HEAD = "roi_convx_head"
 
-# Output module of hier R-CNN head
-__C.HRCNN.ROI_HIER_OUTPUT = "hier_output"
+# Output module of Parsing R-CNN head
+__C.PRCNN.ROI_PARSING_OUTPUT = "parsing_output"
 
 # RoI transformation function and associated options
-__C.HRCNN.ROI_XFORM_METHOD = 'ROIAlign'
+__C.PRCNN.ROI_XFORM_METHOD = 'ROIAlign'
 
-# Sample the positive box across batch per GPU ### TODO
-__C.HRCNN.ACROSS_SAMPLE = False
+# parsing roi size per image (roi_batch_size = roi_size_per_img * img_per_gpu when using across-sample strategy)
+__C.PRCNN.ROI_SIZE_PER_IMG = -1
 
-# Hier roi size per image (roi_batch_size = roi_size_per_img * img_per_gpu when using across-sample strategy)
-__C.HRCNN.ROI_SIZE_PER_IMG = -1
+# Sample the positive box across batch per GPU
+__C.PRCNN.ACROSS_SAMPLE = False
 
-# RoI strides for Hier R-CNN head to use
-__C.HRCNN.ROI_STRIDES = []
+# RoI strides for Parsing R-CNN head to use
+__C.PRCNN.ROI_STRIDES = []
 
-# Number of grid sampling points in RoIAlign (usually use 2)
-# Only applies to RoIAlign
-__C.HRCNN.ROI_XFORM_SAMPLING_RATIO = 0
+# Number of grid sampling points in ROIAlign (usually use 2)
+# Only applies to ROIAlign
+__C.PRCNN.ROI_XFORM_SAMPLING_RATIO = 0
 
-# RoI transformation function (e.g., RoIPool or RoIAlign)
-__C.HRCNN.ROI_XFORM_RESOLUTION = (14, 14)
+# RoI transformation function (e.g., ROIPool or ROIAlign)
+__C.PRCNN.ROI_XFORM_RESOLUTION = (14, 14)
 
-# Overlap threshold for an RoI to be considered foreground (if >= FG_IOU_THRESHOLD)
-__C.HRCNN.FG_IOU_THRESHOLD = 0.7
+# Resolution of Parsing predictions
+__C.PRCNN.RESOLUTION = (56, 56)
 
-# Overlap threshold for an RoI to be considered background
-# (class = 0 if overlap in [0, BG_IOU_THRESHOLD))
-__C.HRCNN.BG_IOU_THRESHOLD = 0.7
+# Number of parsings in the dataset
+__C.PRCNN.NUM_PARSING = -1
 
-# Inference cls score threshold, anchors with score > INFERENCE_TH are
-# considered for inference
-__C.HRCNN.INFERENCE_TH = 0.05
+# The ignore label
+__C.PRCNN.PARSING_IGNORE_LABEL = 255
 
-# NMS threshold used in Hier
-__C.HRCNN.NMS_TH = 0.6
+# When __C.MODEL.SEMSEG_ON is True, parsing += semseg_pred(per instance) * __C.PRCNN.SEMSEG_FUSE_WEIGHT
+__C.PRCNN.SEMSEG_FUSE_WEIGHT = 0.2
 
-# During inference, #locs to select based on cls score before NMS is performed
-# per FPN level
-__C.HRCNN.PRE_NMS_TOP_N = 1000
+# Minimum score threshold (assuming scores in a [0, 1] range) for semantice
+# segmentation results.
+# 0.3 for CIHP, 0.05 for MHP-v2
+__C.PRCNN.SEMSEG_SCORE_THRESH = 0.3
 
-# Number of detections per image
-__C.HRCNN.DETECTIONS_PER_IMG = 100
+# Minimum score threshold (assuming scores in a [0, 1] range); a value chosen to
+# balance obtaining high recall with not having too many low precision parsings
+__C.PRCNN.SCORE_THRESH = 0.001
 
-# Number of hier in the dataset
-__C.HRCNN.NUM_CLASSES = -1
+# Evaluate the AP metrics
+__C.PRCNN.EVAL_AP = True
 
-# Focal loss parameter: alpha
-__C.HRCNN.LOSS_ALPHA = 0.25
+# Multi-task loss weight to use for Parsing R-CNN head
+__C.PRCNN.LOSS_WEIGHT = 1.0
 
-# Focal loss parameter: gamma
-__C.HRCNN.LOSS_GAMMA = 2.0
-
-# Multi-task loss weight to use for hier head
-__C.HRCNN.LOSS_WEIGHT = 1.0
-
-# Prior prob for the positives at the beginning of training. This is used to set
-# the bias init for the logits layer
-__C.HRCNN.PRIOR_PROB = 0.01
-
-# Loc loss type, it can be 'iou', 'liou' and 'giou'
-__C.HRCNN.LOC_LOSS_TYPE = 'giou'
-
-# Normalizing the regression targets with FPN strides
-__C.HRCNN.NORM_REG_TARGETS = True
-
-# Positioning centerness on the regress branch.
-__C.HRCNN.CENTERNESS_ON_REG = True
-
-# Use center sample in the hier head
-__C.HRCNN.CENTER_SAMPLE = True
-
-# Center sample radius in the hier head
-__C.HRCNN.POS_RADIUS = 1.5
-
-# Convolutions to use in the cls and bbox tower
-# NOTE: this doesn't include the last conv for logits
-__C.HRCNN.OUTPUT_NUM_CONVS = 2
-
-# Hidden Conv layer dimension
-__C.HRCNN.OUTPUT_CONV_DIM = 256
-
-# Use hier output Lite (dwconv) to replace standard hier output
-__C.HRCNN.OUTPUT_USE_LITE = False
-
-# Use BatchNorm in the hier output
-__C.HRCNN.OUTPUT_USE_BN = False
-
-# Use GroupNorm in the hier output
-__C.HRCNN.OUTPUT_USE_GN = True
-
-# Use dcn in the last layer of towers
-__C.HRCNN.OUTPUT_USE_DCN = False
-
-# Eval hier
-__C.HRCNN.EVAL_HIER = True
-
-# # considered for hier inference
-__C.HRCNN.HIER_TH = 0.2
-
-# Limit hands and feet
-__C.HRCNN.LIMIT_TYPE = 'hand_and_foot'
+# Use Parsing IoU for Parsing R-CNN head
+__C.PRCNN.PARSINGIOU_ON = False
 
 # ---------------------------------------------------------------------------- #
-# hier R-CNN convx head options
+# Parsing R-CNN convx head options
 # ---------------------------------------------------------------------------- #
-__C.HRCNN.CONVX_HEAD = AttrDict()
+__C.PRCNN.CONVX_HEAD = AttrDict()
 
 # Hidden Conv layer dimension
-__C.HRCNN.CONVX_HEAD.CONV_DIM = 256
+__C.PRCNN.CONVX_HEAD.CONV_DIM = 512
 
 # Number of stacked Conv layers in the RoI box head
-__C.HRCNN.CONVX_HEAD.NUM_STACKED_CONVS = 4
+__C.PRCNN.CONVX_HEAD.NUM_STACKED_CONVS = 8
 
 # Use dilated convolution in the mask head
-__C.HRCNN.CONVX_HEAD.DILATION = 1
+__C.PRCNN.CONVX_HEAD.DILATION = 1
 
-# Use hier R-CNN Lite (dwconv) to replace standard hier R-CNN
-__C.HRCNN.CONVX_HEAD.USE_LITE = False
+# Use Parsing R-CNN Lite (dwconv) to replace standard Parsing R-CNN
+__C.PRCNN.CONVX_HEAD.USE_LITE = False
 
-# Use BatchNorm in the Keyoint R-CNN convx head
-__C.HRCNN.CONVX_HEAD.USE_BN = False
+# Use BatchNorm in the Parsing R-CNN convx head
+__C.PRCNN.CONVX_HEAD.USE_BN = False
 
-# Use GroupNorm in the Keyoint R-CNN convx head
-__C.HRCNN.CONVX_HEAD.USE_GN = False
+# Use GroupNorm in the Parsing R-CNN convx head
+__C.PRCNN.CONVX_HEAD.USE_GN = False
 
 # ---------------------------------------------------------------------------- #
-# hier R-CNN gce head options
+# Parsing R-CNN gce head options
 # ---------------------------------------------------------------------------- #
-__C.HRCNN.GCE_HEAD = AttrDict()
+__C.PRCNN.GCE_HEAD = AttrDict()
 
 # Hidden Conv layer dimension
-__C.HRCNN.GCE_HEAD.CONV_DIM = 512
+__C.PRCNN.GCE_HEAD.CONV_DIM = 512
 
 # Dimension for ASPPV3
-__C.HRCNN.GCE_HEAD.ASPPV3_DIM = 256
+__C.PRCNN.GCE_HEAD.ASPPV3_DIM = 256
 
 # Dilation for ASPPV3
-__C.HRCNN.GCE_HEAD.ASPPV3_DILATION = (6, 12, 18)
+__C.PRCNN.GCE_HEAD.ASPPV3_DILATION = (6, 12, 18)
 
 # Number of stacked Conv layers in GCE head before ASPPV3
-__C.HRCNN.GCE_HEAD.NUM_CONVS_BEFORE_ASPPV3 = 0
+__C.PRCNN.GCE_HEAD.NUM_CONVS_BEFORE_ASPPV3 = 0
 
 # Number of stacked Conv layers in GCE head after ASPPV3
-__C.HRCNN.GCE_HEAD.NUM_CONVS_AFTER_ASPPV3 = 0
+__C.PRCNN.GCE_HEAD.NUM_CONVS_AFTER_ASPPV3 = 0
 
-# Use NonLocal in the hier R-CNN gce head
-__C.HRCNN.GCE_HEAD.USE_NL = False
+# Use NonLocal in the Parsing R-CNN gce head
+__C.PRCNN.GCE_HEAD.USE_NL = False
 
 # Reduction ration of nonlocal
-__C.HRCNN.GCE_HEAD.NL_RATIO = 1.0
+__C.PRCNN.GCE_HEAD.NL_RATIO = 1.0
 
-# Use BatchNorm in the hier R-CNN gce head
-__C.HRCNN.GCE_HEAD.USE_BN = False
+# Use BatchNorm in the Parsing R-CNN gce head
+__C.PRCNN.GCE_HEAD.USE_BN = False
 
-# Use GroupNorm in the hier R-CNN gce head
-__C.HRCNN.GCE_HEAD.USE_GN = False
+# Use GroupNorm in the Parsing R-CNN gce head
+__C.PRCNN.GCE_HEAD.USE_GN = False
+
+# ---------------------------------------------------------------------------- #
+# Parsing IoU options
+# ---------------------------------------------------------------------------- #
+__C.PRCNN.PARSINGIOU = AttrDict()
+
+# The head of Parsing IoU to use
+# (e.g., "convx_head")
+__C.PRCNN.PARSINGIOU.PARSINGIOU_HEAD = "convx_head"
+
+# Output module of Parsing IoU head
+__C.PRCNN.PARSINGIOU.PARSINGIOU_OUTPUT = "linear_output"
+
+# Number of stacked Conv layers in the Parsing IoU head
+__C.PRCNN.PARSINGIOU.NUM_STACKED_CONVS = 2
+
+# Hidden Conv layer dimension of Parsing IoU head
+__C.PRCNN.PARSINGIOU.CONV_DIM = 128
+
+# Hidden MLP layer dimension of Parsing IoU head
+__C.PRCNN.PARSINGIOU.MLP_DIM = 256
+
+# Use BatchNorm in the Parsing IoU head
+__C.PRCNN.PARSINGIOU.USE_BN = False
+
+# Use GroupNorm in the Parsing IoU head
+__C.PRCNN.PARSINGIOU.USE_GN = False
+
+# Loss weight for Parsing IoU head
+__C.PRCNN.PARSINGIOU.LOSS_WEIGHT = 1.0
+
 
 # ---------------------------------------------------------------------------- #
 # Visualization options
@@ -1334,15 +1330,27 @@ __C.VIS.SHOW_SEGMS.BORDER_COLOR = (255, 255, 255)
 __C.VIS.SHOW_SEGMS.BORDER_THICK = 2
 
 # ---------------------------------------------------------------------------- #
-# Show hier options
+# Show parsing options
 # ---------------------------------------------------------------------------- #
-__C.VIS.SHOW_HIER = AttrDict()
+__C.VIS.SHOW_PARSS = AttrDict()
 
 # Visualizing detection classes
-__C.VIS.SHOW_HIER.ENABLED = True
+__C.VIS.SHOW_PARSS.ENABLED = True
+
+# Color map, 'COCO81', 'VOC21', 'ADE151', 'LIP20', 'MHP59'
+__C.VIS.SHOW_PARSS.COLORMAP = 'CIHP20'
+
+# Parsing alpha
+__C.VIS.SHOW_PARSS.PARSING_ALPHA = 0.4
+
+# Whether show border
+__C.VIS.SHOW_PARSS.SHOW_BORDER = True
+
+# Border color
+__C.VIS.SHOW_PARSS.BORDER_COLOR = (255, 255, 255)
 
 # Border thick
-__C.VIS.SHOW_HIER.BORDER_THICK = 2
+__C.VIS.SHOW_PARSS.BORDER_THICK = 1
 
 
 # ---------------------------------------------------------------------------- #
