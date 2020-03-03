@@ -1,12 +1,12 @@
-# Hier-R-CNN
-Official implementation of **Hier R-CNN: Instance-level Human Parts Detection and A New Benchmark (under review)**
+# RP-R-CNN
+Official implementation of **Renovating Parsing R-CNN for Accurate Multiple Human Parsing (under review)**
 
-In this repository, we release the COCO Human Parts dataset and Hier R-CNN code in Pytorch.
+In this repository, we release the RP R-CNN code in Pytorch.
 
-- Hier R-CNN architecture:
-<p align="center"><img width="90%" src="data/hier_rcnn.png" /></p>
+- RP R-CNN architecture:
+<p align="center"><img width="90%" src="data/rp_rcnn.png" /></p>
 
-- Hier R-CNN output:
+- RP R-CNN output:
 <p align="center"><img width="75%" src="data/output.png" /></p>
 
 
@@ -15,33 +15,23 @@ In this repository, we release the COCO Human Parts dataset and Hier R-CNN code 
 - pytorch1.1
 - python3.6.8
 
-Install Hier R-CNN following [INSTALL.md](https://github.com/soeaver/Hier-R-CNN/blob/master/INSTALL.md#install).
-
-
-# Dataset
-
-You can download the annotations of COCO Human Parts [here](https://drive.google.com/open?id=1pT8aOTlVskaAtMadeAHzRrnxnEIxZbV8). And following [Data](https://github.com/soeaver/Hier-R-CNN/blob/master/INSTALL.md#data-and-pre-train-weights) to train or evaluate Hier R-CNN models.
+Install RP R-CNN following [INSTALL.md](https://github.com/soeaver/RP-R-CNN/blob/master/INSTALL.md#install).
 
 
 ## Results and Models
-|  Backbone  |  LR  | MS training | DCN | Det AP | Sub AP | DOWNLOAD |
-|------------|:----:|:-----------:|:---:|:------:|:------:| :-------:|
-|  R-50-FPN  |  1x  | No          | No  | 36.8   | 33.5   | [GoogleDrive](https://drive.google.com/open?id=1-nOef31NrjMyZXkK8fJRmPi-aRQJm7dS)|
-|  R-50-FPN  |  2x  | Yes         | No  | 39.3   | 37.3   |          |
-|  R-50-FPN  |  1x  | No          | Yes | 38.6   | 36.0   |          |
-|  R-50-FPN  |  2x  | Yes         | Yes | 40.6   | 37.3   | [GoogleDrive](https://drive.google.com/open?id=1nrX26Uj7ymOpvPb0Q0AZEY97-43XJdLH)|
-||
-|  R-101-FPN |  1x  | No          | No  | 37.2   | 33.8   |          |
-||
-|  X-101-FPN |  1x  | No          | No  | 38.8   | 36.3   |          |
-|  X-101-FPN |  2x  | Yes         | No  | 40.5   | 38.6   |          |
-|  X-101-FPN |  1x  | No          | Yes | 40.3   | 37.1   |          |
-|  X-101-FPN |  2x  | Yes         | Yes | 42.0   | 38.8   | [GoogleDrive](https://drive.google.com/open?id=1opxyPK3TU27W65r_OHxnsTvf8UJFV_hK)|
+
+**On CIHP**
+
+|  Backbone  |  LR  | Det AP | Parsing (mIoU/APp50/APvol/PCP50) | DOWNLOAD |
+|------------|:----:|:------:|:--------------------------------:| :-------:|
+|  R-50-FPN  |  3x  | 67.3   |        58.2/71.6/58.3/62.2       | [GoogleDrive](https://drive.google.com/open?id=1-nOef31NrjMyZXkK8fJRmPi-aRQJm7dS)|
+|  R-50-FPN  |  6x  | 68.2   |        60.2/74.1/59.5/64.9       | [GoogleDrive](https://drive.google.com/open?id=1-nOef31NrjMyZXkK8fJRmPi-aRQJm7dS)|
+|    +tta    |  6x  | 68.2   |        60.2/74.1/59.5/64.9       | [GoogleDrive](https://drive.google.com/open?id=1-nOef31NrjMyZXkK8fJRmPi-aRQJm7dS)|
 
 **ImageNet pretrained weight**
 
-- [R50](https://drive.google.com/open?id=1EtqFhrFTdBJNbp67effArVrTNx4q_ELr)
-- [X101-32x8d](https://drive.google.com/open?id=1c4OSVZIZtDT49B0DTC0tK3vcRgJpzR9n)
+- [R-50](https://drive.google.com/open?id=1EtqFhrFTdBJNbp67effArVrTNx4q_ELr)
+- [X-101-32x8d](https://drive.google.com/open?id=1c4OSVZIZtDT49B0DTC0tK3vcRgJpzR9n)
 
 
 ## Training
