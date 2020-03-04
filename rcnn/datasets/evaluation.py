@@ -145,29 +145,9 @@ def prepare_segmentation_results(results, image_ids, dataset):
         img_info = dataset.get_img_info(image_id)
         image_width = img_info["width"]
         image_height = img_info["height"]
-        input_w, input_h = result.size
         result = result.resize((image_width, image_height))
         masks = result.get_field("mask")
-        if cfg.MODEL.EMBED_MASK_ON:
-            import pycocotools.mask as mask_util
-            # resize masks
-            stride_mask = result.get_field('stride')
-            h = (masks.shape[1] * stride_mask.float() * image_height / input_h).ceil().long()
-            w = (masks.shape[2] * stride_mask.float() * image_width / input_w).ceil().long()
-            mask_th = result.get_field('mask_th').cuda()
-            masks = masks.cuda()
-            masks = torch.nn.functional.interpolate(input=masks.unsqueeze(1).float(), size=(h, w), mode="bilinear",
-                                                    align_corners=False).gt(mask_th)
-            masks = masks[:, :, :image_height, :image_width]
-            masks = masks.cpu()
-            rles = [
-                mask_util.encode(np.array(mask[0, :, :, np.newaxis], order="F"))[0] for mask in masks
-            ]
-            for rle in rles:
-                rle["counts"] = rle["counts"].decode("utf-8")
-        else:
-            rles = mask_results(masks, result)
-        # boxes = prediction.bbox.tolist()
+        rles = mask_results(masks, result)
         scores = result.get_field("mask_scores").tolist()
         labels = result.get_field("labels").tolist()
         ims_segs.append(rles)

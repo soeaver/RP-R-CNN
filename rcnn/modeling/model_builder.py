@@ -129,9 +129,9 @@ class Generalized_RCNN(nn.Module):
             x, result, loss_mask = self.Mask_RCNN(conv_features, result, targets)
             roi_losses.update(loss_mask)
 
-        if cfg.MODEL.HIER_ON:
-            x, result, loss_hier = self.Hier_RCNN(conv_features, result, targets)
-            roi_losses.update(loss_hier)
+        if cfg.MODEL.PARSING_ON:
+            x, result, loss_parsing = self.Parsing_RCNN(conv_features, result, targets)
+            roi_losses.update(loss_parsing)
 
         if self.training:
             outputs = {'metrics': {}, 'losses': {}}
