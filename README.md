@@ -18,7 +18,7 @@ If you use RP R-CNN, please use the following BibTeX entry.
 @inproceedings{yang2020eccv,
   title = {Renovating Parsing R-CNN for Accurate Multiple Human Parsing},
   author = {Lu Yang and Qing Song and Zhihui Wang and Mengjie Hu and Chun Liu and Xueshi Xin and Wenhe Jia and Songcen Xu},
-  booktitle = {Proceedings of the IEEE Conference on European Conference on Computer Vision (ECCV)},
+  booktitle = {Proceedings of European Conference on Computer Vision (ECCV)},
   year = {2020}
 }
 
