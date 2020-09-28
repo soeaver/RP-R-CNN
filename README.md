@@ -1,5 +1,5 @@
 # RP-R-CNN
-Official implementation of **Renovating Parsing R-CNN for Accurate Multiple Human Parsing (under review)**
+Official implementation of **Renovating Parsing R-CNN for Accurate Multiple Human Parsing ([ECCV2020](https://arxiv.org/abs/2009.09447))**
 
 In this repository, we release the RP R-CNN code in Pytorch.
 
